@@ -1,0 +1,44 @@
+---
+- name: Retrieve host vars
+  hosts: all
+  become: true
+  tasks:
+
+    - name: change hostname
+      ansible.builtin.hostname:
+         name: "{{hostvars[inventory_hostname].tags.Name}}"
+      when: hostvars[inventory_hostname].tags.Managed == "true"
+
+    - name: install service tag
+      ansible.builtin.yum:
+        name: "{{hostvars[inventory_hostname].tags.Service}}-{{hostvars[inventory_hostname].tags.Version}}"
+        state: present
+      when: hostvars[inventory_hostname].tags.Managed == "true"
+
+    - name: Enable and start service tag
+      vars:
+        mariadb_service: "mariadb"
+      ansible.builtin.service:
+        name: "{{ mariadb_service if 'mariadb' in hostvars[inventory_hostname].tags.Service else hostvars[inventory_hostname].tags.Service }}"
+        enabled: yes
+        state: started
+
+
+    - name: cronie install
+      ansible.builtin.yum:
+        name: cronie
+
+    - name: Enable and start cronie
+      ansible.builtin.service:
+        name: crond
+        enabled: yes
+        state: started
+
+    - name: Ensure cronjobs of tags!
+      ansible.builtin.cron:
+        name: "check dirs"
+        weekday:  "{{ hostvars[inventory_hostname].tags.Restart[0:1]| int }}"
+        hour: "{{ hostvars[inventory_hostname].tags.Restart[1:2] | int }}"
+        job: "reboot"
+
+
